@@ -6,9 +6,9 @@ else
     a1 = p.a1; a2 = p.a2;
 end
 
-CM = 1./(1+((p.k*p.R1).^p.gamma));
+CM = 1./(1+((p.k.*p.R1).^p.gamma));
 I1 = a1.*CM;
-CM = 1./(1+((p.k*p.R2).^p.gamma));
+CM = 1./(1+((p.k.*p.R2).^p.gamma));
 I2 = a2.*CM;
 
 I = I1+I2;

@@ -10,8 +10,8 @@ ss = 50; % simulation resolution
 p.y = 0; 
 p.rad = 225/2;
 
-% Ahuja params
-p.k = 6.5; 
+p.k = 6.5; % Ahuja params
+p.k = [3.5 ]; % Esler
 p.gamma = 1.69;
 p.threshOrig = 23.392 *8.5; % 23 is spiking threshold, 50 a reasonable psycho estimate for a pulse train
 
