@@ -26,10 +26,12 @@ classdef cs
                 ret.I = ret.I + ret.e(i).I;
             end
             ret.I(ret.Z<max([ret.z ret.z])) = 0; % remove all current above the electrode
+            Sxy = ret.I(:, :, round(size(ret.I, 3)/2));
             if isfield(ret, 'loc') % if choosing a particular location on the retina at which to know amplitude
-                ret.Vq = interpn(unique(ret.Y), unique(ret.X), unique(ret.Z), ret.I, ret.loc(2), ret.loc(1), ret.loc(3));
+                disp('calculating threshold at a specific location')
+                ret.Vq = interpn(unique(ret.Y), unique(ret.X),Sxy, ret.loc(2), ret.loc(1));
             else % find the max amplitude
-                ret.Vq = max(max(ret.I(:, :, round(size(ret.I, 3)/2))));
+                ret.Vq = max(Sxy(:));
             end
         end
 
@@ -56,7 +58,7 @@ classdef cs
                 % lo ranges aren't too narrow
             end
             ret.t = (hi+lo)/2;
-            % disp(['max current on retina = ', num2str(ret.Vq), ' retinal thresh = ', num2str(ret.t_ret)]);
+             disp(['max current on retina = ', num2str(ret.Vq), ' retinal thresh = ', num2str(ret.t_ret)]);
         end
 
 
