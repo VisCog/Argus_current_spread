@@ -2,15 +2,22 @@
 close  all
 clear all
 
-lowres = 1;
+lowres = 1; % sampling at low resolution or hi, warning, run hi res overnight or load retinal_data 
+
 % electrode parameters
+
+
 ret.z_range = 0:50:1000; % different heights (microns)
+if lowres
+     ret.z_range = 0:100:1000;
+end
 
 
 ret.rad = 225/2;
 ret.lim = [500, 1500, 1100]; % how much retina to simulate. x, y, z
-ret.ss = 25; % simulation resolution
-
+if lowres
+ret.ss = 50; % simulation resolution
+end
 % plot params
 plt.pos = [ 42   1088  939   231];
 
@@ -26,8 +33,14 @@ zv = -ret.lim(3):ret.ss:ret.lim(3);
 
 ret.k_range = 6:1:20; % controls current spread
 ret.a_range = 1:.5:3;
+if lowres
+    ret.k_range = 6:3:20; % controls current spread
+    ret.a_range = 1:1:3;
+end
 
-% plotted curves and chose good values of a and k
+% this is a previous run version that works out which values of a and k 
+% give neurophysiologically plausible curves of threshold as a function of 
+% height from the retinal surface, don't change these!
 saved_a_range = 1:.5:3;
 saved_k_range = 6:3:20;
 saved_good_ak = [0  1  1 1  1; 1  1  1  1 1; 1  1 1  1  1;  1  1  1  0  0;   1   1   0 0   0];
@@ -36,14 +49,18 @@ good_ak_example = [1.5,15]; % the a and k values in the middle of acceptable val
 ret.t_ret_min = 50; % minimum retinal current required to reach perceptual
 
 % threshold
-ret.t_rd_range = 0:100:600; % threshold elevation due to retinal damage (mAmps)
+ret.t_rd_range = 0:50:600; % threshold elevation due to retinal damage (mAmps)
+if lowres
+    ret.t_rd_range = 0:200:600;
+end
 
 fitParams.tol = 0.001;
 fitParams.lo = 0;
 fitParams.hi = 5000;
 fitParams.thr = 1;
+if lowres
 fitParams.nreps = 20;
-
+end
 %% calculate thresholds as a function of height, where no retinal damage, single electrode
 ret_s = ret; ret_s.t_ret = ret.t_ret_min;
 ret_s.x = 0; ret_s.y = 0;
@@ -187,9 +204,11 @@ for z = 1:length(ret_p.z_range)
                     ret_p.amp_mid(a, k,z,r) = interpn(unique(ret_p.Y), unique(ret_p.X), unique(ret_p.Z), ret_p.I, 0, 0, 0);
                 end
             else
-                ret_p.t_fit(a, k,z,r)  = NaN;
-                ret_p.amp_max(a, k,z,r) = NaN;
-                ret_p.amp_mid(a, k,z,r) = NaN;
+                for r = 1:length(ret_p.t_rd_range)
+                    ret_p.t_fit(a, k,z,r)  = NaN;
+                    ret_p.amp_max(a, k,z,r) = NaN;
+                    ret_p.amp_mid(a, k,z,r) = NaN;
+                end
             end
         end
     end
@@ -209,7 +228,7 @@ for a =1:length(ret_p.a_range)
     %c = colorbar('Ticks',linspace(1, 255, 5), 'TickLabels',{'0','25','50','75','100'});
     contour(ret_p.z_range, ret_p.k_range, squeeze(ret_p.dip(a, :,:, 1)), [30 70], 'g')
 end
-return
+
 
 %% intersection of constraints, which combinations of z and k, for a fixed r, are plausible
 
@@ -250,29 +269,29 @@ end
 %% patch of good values, Panel D
 cmap = hot(length(ret_p.k_range)+8);
 figure(6); clf
-
+gv = [];
 for a = 1:length(ret_p.a_range)
     subplot(2,2,a)
-for k=length(ret_p.k_range):-1:1
-    gv =ret_p.gv(a, k,:,:); gv_idx = find(gv(:)); % find the values that are ok
-    t_z = ret_p.t_z_fit(a, k, :, :); t_z = t_z(:); t_z = t_z(gv_idx); % collect the increase in thr due to lift
-    t_all = ret_p.t_fit(a, k, :, :);t_all = t_all(:); t_all = t_all(gv_idx);
-    t_rd = ret_p.t_rd_fit(a, k, :, :); t_rd = t_rd(:); t_rd = t_rd(gv_idx);
-    zv = repmat(ret_p.z_range, 1, length(ret_p.t_rd_range)); zv = zv(:); zv = zv(gv_idx);
-    round(min(t_z(:)+t_rd(:)))
-    round(max(t_z(:)+t_rd(:)))
-    round(max(t_all(:)))
+    for k=length(ret_p.k_range):-1:1
+        gv = ret_p.gv(a, k,:,:); gv_idx = find(gv(:)); % find the values that are ok
+        t_z = ret_p.t_z_fit(a, k, :, :); t_z = t_z(:); t_z = t_z(gv_idx); % collect the increase in thr due to lift
+        t_all = ret_p.t_fit(a, k, :, :);t_all = t_all(:); t_all = t_all(gv_idx);
+        t_rd = ret_p.t_rd_fit(a, k, :, :); t_rd = t_rd(:); t_rd = t_rd(gv_idx);
+        zv = repmat(ret_p.z_range, 1, length(ret_p.t_rd_range)); zv = zv(:); zv = zv(gv_idx);
+        round(min(t_z(:)+t_rd(:)))
+        round(max(t_z(:)+t_rd(:)))
+        round(max(t_all(:)))
 
-    if length(gv_idx)>6
-        DT = delaunayTriangulation(t_z,t_rd);
-        C = convexHull(DT);
-        h(k)=patch(DT.Points(C,1),DT.Points(C,2), cmap(k,:), 'EdgeColor', 'none', 'FaceAlpha',.3); hold on
+        if length(gv_idx)>6
+            DT = delaunayTriangulation(t_z,t_rd);
+            C = convexHull(DT);
+            h(k)=patch(DT.Points(C,1),DT.Points(C,2), cmap(k,:), 'EdgeColor', 'none', 'FaceAlpha',.3); hold on
+        end
     end
-end
-set(gca, 'XLim', [ 0 300])
-set(gca, 'YLim', [ 0 600])
-xlabel('threshold elevation due to retinal degeneration')
-ylabel('threshold elevation due to array lift')
+    set(gca, 'XLim', [ 0 300])
+    set(gca, 'YLim', [ 0 600])
+    xlabel('threshold elevation due to retinal degeneration')
+    ylabel('threshold elevation due to array lift')
 end
 
 %% thresholds
