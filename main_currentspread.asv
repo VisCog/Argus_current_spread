@@ -1,0 +1,873 @@
+
+close  all
+clear all
+
+
+% plot params
+plt.pos = [ 42   1088  939   231];
+fitParams.nreps = 12; fitParams.tol = 0.001; fitParams.lo = 0; fitParams.hi = 5000; fitParams.thr = 1;
+safety_lim = 660;
+res_flag = 'highres';
+ret = cs.setdefaultparams(res_flag);
+savestr = ['3_21_2022', '_', res_flag];
+ret.pair.eI = NaN(length(ret.d_range), length(ret.a_range), length(ret.k_range), length(ret.z_range), length(ret.rd_range));
+ret.pair.I_max = ret.pair.eI; ret.pair.I_mid = ret.pair.eI; ret.pair.dip = ret.pair.eI; ret.pair.rd_fac = ret.pair.eI; ret.pair.z_fac = ret.pair.eI;
+
+%% calculate thresholds as a function of height, for all the possible retinal damages, single electrode
+
+ret.x = 0; ret.y = 0; % location of the electrode
+for z = 1:length(ret.z_range)
+    disp(['fitting z = ', num2str(z),  ' out of ', num2str(length(ret.z_range))]);
+    ret.z = -ret.z_range(z);
+    ret = cs.calc_dist_from_electrode(ret);
+    for r = 1:length(ret.rd_range)
+        ret.t_ret = ret.rd_range(r) * ret.t_ret_min;
+        for a = 1:length(ret.a_range)
+            ret.a = ret.a_range(a);
+            for k = 1:length(ret.k_range)
+                ret.k = ret.k_range(k);
+                % find the threshold for the z
+                ret = cs.fit_currentspreadfast(ret, fitParams);
+                ret.single.eI(a, k, z, r) = ret.eI;
+            end
+        end
+    end
+end
+
+%% calculate how much z and rd raise threshold
+for z = 1:length(ret.z_range)
+    for r = 1:length(ret.rd_range)
+        for a = 1:length(ret.a_range)
+            for k = 1:length(ret.k_range)
+                ret.single.thr_RD_fac(a, k, z, r) = ret.rd_range(r);
+                ret.single.thr_Z_fac(a, k, z,r) = ret.single.eI(a, k, z, r)./(ret.single.eI(a, k, 1, 1) * ret.single.thr_RD_fac(a, k, z, r));
+            end
+        end
+    end
+end
+
+
+%% plot thresholds as a function of height, for a variety of retinal damage, single electrode
+figure(1); clf
+
+for a = 1:length(ret.a_range)
+    for k = 1:length(ret.k_range)
+        for r = 1:length(ret.rd_range)
+
+            subplot(1,2,1)
+            plot(ret.z_range, squeeze(ret.single.eI(a,k, :, r)), 'k'); hold on
+            xlabel('z'); ylabel('threshold non damaged retina')
+            text(ret.z_range(end-1),  ret.single.eI(1,k, end-1, 1), ['k = ',num2str(ret.k_range(k))]);
+            set(gca, 'XLim', [0 1000]); set(gca, 'XTick', [0:200:1000])
+            set(gca, 'YLim', [0 700]);set(gca, 'YTick',[0:100:700])
+
+            subplot(1,2,2)
+            plot(log(ret.z_range), squeeze(log(ret.single.eI(a,k, :, r))) , 'k'); hold on
+            xlabel('z'); ylabel('threshold non damaged retina')
+            text(log(ret.z_range(end-1)),  log(ret.single.eI(1,k, end-1, r)), ['k = ',num2str(ret.k_range(k))]);
+            set(gca, 'XTick', log([ 100 1000]));  set(gca, 'XLim', log([50 2000])); set(gca, 'XTickLabel',[100 1000]); logx2raw
+            set(gca, 'YTick', log([10  100 1000])); set(gca, 'YLim', log([9 2000])); set(gca, 'YTickLabel',[10 100 1000]); logy2raw
+        end
+    end
+end
+
+ret_s = ret; clear ret;
+save([savestr, 'single']);
+
+
+%% plot, current spreads for 2 electrodes at different heights
+fitParams.nreps = 20;
+clear ret; ret = cs.setdefaultparams(res_flag);
+ret.ss = 25;
+ret.a = 1.5; ret.k = 15;
+ret.t_lift = 0;
+ret.x = [-700 700];
+ret.y = [0 0];
+ret_saved = ret;
+
+z_list = [-150 -750];
+for zz = 1:2 % simulating pairs of electrodes, at two different heights
+    ret.amp_mid = NaN;
+    ret.amp_max = NaN;
+    ret.z = z_list(zz);
+    figure(zz+1);clf
+    ret = cs.calc_dist_from_electrode(ret);
+    if isfield(ret, "loc")
+        ret = rmfield(ret, "loc");
+    end
+    ret = cs.fit_currentspreadfast(ret, fitParams);
+    % now double it and calculate what the current spread looks like
+    ret.eI =  ret.eI * 2;
+    ret = cs.create_currentspread(ret);
+    set(gcf, 'Position', plt.pos);
+    set(gcf, 'Name', ['height = ', num2str(ret.z)]);
+    Ixy = ret.I(:, :, round(size(ret.I, 3)/2));
+    ret.amp_max = max(Ixy(:));
+    [y, x] = find(Ixy == ret.amp_max);
+    ret.amp_mid = interpn(unique(ret.Y), unique(ret.X),Ixy, 0, 0);
+    ret.dip = 100.*((ret.amp_max-ret.t_ret_min)-(ret.amp_mid-ret.t_ret_min))./(ret.amp_max-ret.t_ret_min);
+    ret.loc = [x y];
+    cs.create_currentspreadfig(ret); drawnow
+end
+
+
+%% simulate a range of parameter values
+clear ret; ret = cs.setdefaultparams(res_flag);
+ret.a = 1.5; ret.k = 15;
+% ret.t_lift = 0;
+ret.x = [-700 700];
+ret.y = [0 0];
+for d_val = 1:length(ret.d_range)
+    disp(['fitting d = ', num2str(d_val),  ' out of ', num2str(length(ret.d_range))]);
+    ret.x = [-round(ret.d_range(d_val)/2) round(ret.d_range(d_val)/2)];
+    for z = 1:length(ret.z_range)
+        disp(['  fitting z = ', num2str(z),  ' out of ', num2str(length(ret.z_range))]);
+        ret.z = -ret.z_range(z);
+        ret = cs.calc_dist_from_electrode(ret);
+        for k = 1:length(ret.k_range)
+            ret.k = ret.k_range(k);
+            for a = 1:length(ret.a_range)
+                ret.a = ret.a_range(a);
+                for r = 1:length(ret.rd_range)
+                    if ret_s.single.eI(a, k, z, r)<safety_lim
+                        ret.eI = ret_s.single.eI(a, k, z, r) * 2;
+                        if ret.eI>safety_lim
+                            ret.eI = safety_lim; % safety limit
+                        end
+                        ret = cs.create_currentspread(ret);
+                        % max current value on the surface of the retina
+                        ret.pair.I_max(d_val, a, k, z, r) = max(max(ret.I(:, :, round(size(ret.I, 3)/2))));
+                        % current value directly in between the two electrodes
+                        ret.pair.I_mid(d_val, a, k, z, r) = interpn(unique(ret.Y), unique(ret.X), unique(ret.Z), ret.I, 0, 0, 0);
+                    else
+                        ret.pair.I_max(d_val, a, k, z, r) = NaN;
+                        ret.pair.I_mid(d_val, a, k, z, r)  = NaN;
+                    end
+
+                end
+            end
+        end
+    end
+end
+
+
+
+%% calculate dip
+for r = 1:length(ret.rd_range)
+    rmin = 50 *ret.rd_range(r);
+    I_max = ret.pair.I_max(:, :, :, :, r) - rmin; I_max(I_max<0)=0;
+    I_mid = ret.pair.I_mid(:, :, :, :, r) - rmin; I_mid(I_mid<0)=0;
+    ret.pair.dip_rd(:, :, :, :, r) = 100.*(I_max-I_mid)./I_max; % 100 means big dip
+end
+
+I_max = ret.pair.I_max - rmin; I_max(I_max<0)=0;
+I_mid = ret.pair.I_mid - rmin; I_mid(I_mid<0)=0;
+ret.pair.dip= 100.*(I_max-I_mid)./I_max; % 100 means big dip
+
+%ret.pair.dip = 100.*((ret.pair.I_max)-(ret.pair.I_mid))./(ret.pair.I_max);
+save([savestr, '_pair']);
+
+
+%% collect values that don't meet criteria
+cmap = hot(256);
+
+thr_d = [1400 2059 1191];
+thr_a = [218 331; 355  621; 177 280];
+
+for s = 1:3
+    tmp = find((abs(ret.d_range-thr_d(s)))==min(abs(ret.d_range-thr_d(s))));
+    d_ind(s) = tmp(1); % find the index for electrodes separated by the 2pt discrim for that participant
+end
+
+gv = ones(3, length(ret.a_range), length(ret.k_range), length(ret.z_range), length(ret.rd_range));
+gv_gen = ones(length(ret.a_range), length(ret.k_range), length(ret.z_range), length(ret.rd_range));
+
+for a = 1:length(ret.a_range)
+    for k = 1:length(ret.k_range)
+        for z = 1:length(ret.z_range)
+            ret.z = ret.z_range(z); % no need to make it negative
+            for r = 1:length(ret.rd_range)
+                if ret.z>999 && ret_s.single.eI(a,k,z,r)<500 % threshold as a function of z rises unreasonably slow
+                    gv(:, a, k, :, r) = NaN; % exclude that conjunction of a and k
+                    gv_gen(a, k, :, r) = NaN;
+                end
+                if ret.z<700 && ret_s.single.eI(a,k,z,r)>700 % threshold as a function of z rises unreasonably fast
+                    gv(:, a, k, :, r) = NaN;
+                    gv_gen(a, k, :, r) = NaN;
+                end
+                if ret_s.single.eI(a, k, z, r)>safety_lim
+                    gv(:, a, k, z, r) = NaN;
+                    gv_gen(a, k, z, r) = NaN;
+                end
+
+                for s = 1:3
+                    if ret_s.single.eI(a, k, z, r)<thr_a(s,1) ||  ret_s.single.eI(a, k, z, r)>thr_a(s,2)
+                        gv(s, a, k, z, r) = NaN; % thresholds for a single electrode unrealistic for that subject
+                    end
+                    if ret.pair.dip(d_ind(s), a, k, z, r)<20 || ret.pair.dip(d_ind(s), a,k, z, r)>60
+                        gv(s, a, k, z, r) = NaN;
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+%% create isodipcurve
+ret.eI_range = 50:100:750;
+figure(10); clf; hold on
+p = 1.0e+02 * [0.003063282575664  -1.546555906566781];
+dip_crit = 1:99;
+gv_iso= zeros(length(ret.a_range), length(ret.k_range), length(ret.z_range), length(ret.rd_range), length(dip_crit));
+clear dist ypred_eI
+
+amp_max = 660; %280; 177; %;
+amp_min = 177;%177; %
+% find the distances corresponding to each possible dip criterion, and the
+% expected amplitude based on the regression model, for that distance
+
+dip_c = []; dist_c = []; polyfit_eI_c = [];Z_c = [];RD_c = []; eI_c = [];a_c = []; k_c = []; z_c = [];
+
+for k = 1:length(ret.k_range)
+    disp(k)
+    for a = 1:length(ret.a_range)
+        for r = 1:length(ret.rd_range)
+            for z = 1:length(ret.z_range)
+                if ret_s.single.eI(a, k, z, r)>amp_min && ret_s.single.eI(a, k, z, r)<amp_max 
+                    ind = find(ret.pair.dip(:, a, k, z, r) > 0 & ret.pair.dip(:, a, k, z, r)<99); % find distances with  dips
+                    if length(ind)>3% find all the distances for which dip values that are positive
+                        dip_c =  vertcat(dip_c,  reshape(ret.pair.dip(ind, a, k, z, r), length(ind), 1));
+                        dist_c = vertcat(dist_c, reshape(ret.d_range(ind), length(ind), 1));
+                        polyfit_eI_c = vertcat([polyfit_eI_c], [polyval(p,  dist_c)]);
+                        eI_c =         vertcat(eI_c(:), ones(size(ind)).*ret_s.single.eI(a, k, z, r));
+                        Z_c =       vertcat( Z_c(:),  ones(size(ind)).*squeeze(ret_s.single.thr_Z_fac(a, k,z,r)));
+                        RD_c =      vertcat(RD_c(:), ones(size(ind)).* ret.rd_range(r));
+                        a_c = vertcat( a_c(:), ones(size(ind))*ret.a_range(a));
+                        k_c = vertcat( k_c(:), ones(size(ind))*ret.k_range(k));
+                        z_c = vertcat( z_c(:), ones(size(ind))*ret.z_range(z));
+                    end
+                end
+                
+            end
+        end
+    end
+end
+
+
+%% calculate error and plot
+figure(11); clf
+y_pred = polyval(1.0e+02 * [0.003063282575664  -1.546555906566781], ret.d_range);
+plot(ret.d_range(2:end),y_pred(2:end) , 'g-', 'LineWidth', 2); hold on
+set(gca, 'YLim', [50 700])
+set(gca, 'XLim', [500 4000])
+xlabel('Physical Distance ');
+ylabel('Amplitude');
+err = [];
+ct = 1;
+for k = 1:length(ret.k_range)
+    for a = 1:length(ret.a_range)
+        for r = 1:length(ret.rd_range)
+            for z = 1:length(ret.z_range)
+                ind = find(a_c == ret.a_range(a) & k_c == ret.k_range(k) & RD_c ==ret.rd_range(r) & z_c ==ret.z_range(z));
+                if length(ind)>3
+                    err(ct) = mean((polyfit_eI_c(ind)-eI_c(ind)).^2);
+                    if err<4000
+                        d  = dist_c(ind);eI = eI_c(ind);
+                        [~, i2] = sort(d);
+                        plot(d(i2), eI(i2), 'k')
+                    end
+                end
+            end
+        end
+    end
+end
+%% scatter plots
+err_Thr = prctile(err, 50);
+ind = find(err<err_Thr)
+figure(11); clf
+
+p = scatter([Z_c(ind)+.02*randn(size(ind))], [RD_c(ind)+.02*randn(size(ind))], 'ko', 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', .5); hold on
+xlabel('Lift values');
+ylabel('RD values');
+axis equal
+set(gca, 'XLim', [.9 9])
+set(gca, 'YLim', [.9 5.5])
+
+figure(12); clf
+hist(Dip_fac)
+set(gca, 'XLim', [0 100])
+set(gca, 'XTick', 0:10:100)
+xlabel('Dip required for 60% discrimination')
+set(gcf, 'Position', [1000        1107        1121         231])
+
+figure(13); clf
+ss = 50;
+h_no_z = histogram(min_dist_no_z(find(~isnan(min_dist_no_z))),100:ss:3000, 'FaceColor',[1 0 0], 'FaceAlpha', .3, 'EdgeAlpha',1); hold on
+h_no_rd = histogram(min_dist_no_rd(find(~isnan(min_dist_no_rd))),100:ss:3000, 'FaceColor',[0 1 0], 'FaceAlpha', .3, 'EdgeAlpha',1); hold on
+h_no_z_rd = histogram(min_dist_no_z_rd(find(~isnan(min_dist_no_z_rd))),ss:100:3000, 'FaceColor',[0 0  1], 'FaceAlpha', .3, 'EdgeAlpha', 1); hold on
+h = histogram(min_dist(find(~isnan(min_dist))),500:ss:3000, 'FaceColor',[1 1 1], 'FaceAlpha', .3, 'EdgeAlpha', 1); hold on
+
+figure(14);clf
+plot(h.BinEdges(2:end)-h.BinWidth/2, h.Values./sum(h.Values), 'k', 'LineWidth', 2); hold on
+plot(h_no_z.BinEdges(2:end)-h_no_z.BinWidth/2, h_no_z.Values./sum(h_no_z.Values), 'r','LineWidth', 2); hold on
+plot(h_no_z_rd.BinEdges(2:end)-h_no_z_rd.BinWidth/2, h_no_z_rd.Values./sum(h_no_z_rd.Values),  'Color', [.5 0 1], 'LineWidth', 2); hold on
+plot(h_no_rd.BinEdges(2:end)-h_no_rd.BinWidth/2, h_no_rd.Values./sum(h_no_rd.Values), 'b','LineWidth', 2); hold on
+line([1557 1557], [ 0 .35],'Color', [.5 .5 .5]); hold on
+line([2291 2291], [ 0 .35], 'Color', [.5 .5 .5])
+line([1324 1324], [ 0 .35], 'Color', [.5 .5 .5])
+%set(gca, 'YLim', [ 0 45])
+line([1557 1557], [ 0 .35],'Color', [.5 .5 .5]); hold on
+line([2291 2291], [ 0 .35], 'Color', [.5 .5 .5])
+line([1324 1324], [ 0 .35], 'Color', [.5 .5 .5])
+set(gca, 'XLim', [0 2700])
+set(gca, 'YLim', [0 .35])
+
+xlabel('Min Distance required for 60% discrimination')
+disp(['all ', num2str(round(prctile(min_dist, [25 50 70])))]); hold on
+disp(['no z ', num2str(round(prctile(min_dist_no_z, [25 50 70])))]); hold on
+disp(['no rd ', num2str(round(prctile(min_dist_no_rd, [25 50 70])))]); hold on
+disp(['no z or rd ', num2str(round(prctile(min_dist_no_z_rd, [25 50 70])))]); hold on
+
+
+
+%
+% %% collate factors
+% z_fac = []; k_fac = []; a_fac = []; rd_fac = []; Z_fac = []; Dip_fac = []; min_dist =[];err_fac = []
+%
+% for k = 1:length(ret.k_range)
+%     disp(k)
+%     for a = 1:length(ret.a_range)
+%         for r = 1:length(ret.rd_range)
+%             for dc = 1:length(dip_crit) % for each dip criterion
+%                 for z = 1:length(ret.z_range)
+%
+%                     y_fit(z) = ret_s.single.eI(a, k, z, r); % the amplitude for each z value
+%                     ind = find(ret.pair.dip(:, a, k, z, r) > 0 & ret.pair.dip(:, a, k, z, r)<99.9);
+%                     if  y_fit(z)>amp_min & y_fit(z)<amp_max & length(ind)>2
+%
+%                         y_pred(z) = squeeze(ypred_eI(a, k, z, r, dc)); % the predicted eI for all z, for that dip criterion
+%
+%                         err = mean((y_fit(ind)-y_pred(ind)).^2);
+%                         if ~isnan(err) & err<10000
+%                             ind_eI = find(y_fit<amp_max & y_fit>amp_min);
+%                             plot(squeeze(dist(a, k, ind_eI, r, dc)), y_fit(ind_eI), '-',  'Color', [ .3 .3 .3 .5]); hold on
+%                             z_fac =   cat(2, z_fac,  squeeze(ret.z_range(ind_eI)));
+%                             k_fac =   cat(2, k_fac,  ret.k_range(k)*ones(1,length(ind_eI)));
+%                             a_fac =   cat(2, a_fac,  ret.a_range(a)*ones(1, length(ind_eI)));
+%                             rd_fac =  cat(2, rd_fac, ret.rd_range(r)*ones(1, length(ind_eI)));
+%                             Z_fac =   cat(2, Z_fac,   squeeze(ret_s.single.thr_Z_fac(a, k, ind_eI,r))');
+%                             Dip_fac = cat(2, Dip_fac, dip_crit(dc)*ones(1, length(ind_eI)));
+%                             err_fac = cat(2, err*ones(1,length(ind_eI)));
+%                             gv_iso(a, k, ind_eI, r, dc) = 1;
+%                         end
+%                     end
+%                 end
+%             end
+%         end
+%     end
+% end
+%
+%
+% y_pred = polyval(1.0e+02 * [0.003063282575664  -1.546555906566781], ret.d_range);
+% plot(ret.d_range(2:end),y_pred(2:end) , 'g-', 'LineWidth', 2); hold on
+% set(gca, 'YLim', [50 700])
+% set(gca, 'XLim', [500 4000])
+% xlabel('Physical Distance ');
+% ylabel('Amplitude');
+%
+% %% now find the minimum dip
+% min_dist = [];min_dist_no_rd= []; min_dist_no_z = []; min_dist_none = [];min_dist_no_z_rd = [];
+% ct = 1;
+% for k = 1:length(ret.k_range)
+%
+%     for a = 1:length(ret.a_range)
+%         for dc = 1:length(dip_crit)
+%             % no rd, multiple lifts
+%             for z = 1:length(ret.z_range)
+%                 for r = 1:length(ret.rd_range)
+%                     if  gv_iso(a, k, z, r, dc) == 1 &&  gv_gen(a, k, z, r) == 1 && ret_s.single.eI(a, k, z, r)<amp_max && ret_s.single.eI(a, k, z, r)>amp_min% if this simulation  passes
+%                         ind_min = find(ret.pair.dip(:, a, k, z, 1)>0 & ret.pair.dip(:, a, k, z, 1)<99.9); % find dips as function of distance for the same simulation, but no retinal degeneration
+%                         if min(ind_min)>0; ind = [min(ind_min)-1; ind_min]; end % add back first 0
+%                         if ~isempty(ind_min)
+%                             tmp = interp1(ret.pair.dip(ind_min, a, k, z, 1), ret.d_range(ind_min), dip_crit(dc)); % find the distance that would produce that dip criterion
+%                             min_dist_no_rd = cat(1, min_dist_no_rd, tmp); % save it
+%                         end
+%
+%                         ind_min = find(ret.pair.dip(:, a, k, 1, r)>0 & ret.pair.dip(:, a, k, 1, r)<99.9);% find dips as function of distance for the same simulation, but no lift
+%                         if min(ind_min)>0; ind = [min(ind_min)-1; ind_min]; end % add back first 0
+%                         if length(ind_min)>3
+%                             tmp = interp1(ret.pair.dip(ind_min, a, k, 1, r), ret.d_range(ind_min), dip_crit(dc));
+%                             min_dist_no_z = cat(1, min_dist_no_z, tmp);
+%                         end
+%
+%                         ind_min = find(ret.pair.dip(:, a, k, 1, 1)>0 & ret.pair.dip(:, a, k, 1, 1)<99.9); % find dips as function of distance for the same simulation, but no retinal degeneration OR lift
+%                         if min(ind_min)>0; ind = [min(ind_min)-1; ind_min]; end % add back first 0
+%                         if length(ind_min)>3
+%                             tmp = interp1(ret.pair.dip(ind_min, a, k, 1, 1), ret.d_range(ind_min), dip_crit(dc)); % find the distance that would produce that dip criterion
+%                             min_dist_no_z_rd = cat(1, min_dist_no_z_rd, tmp);
+%                         end
+%
+%                         ind_min = find(ret.pair.dip(:, a, k, z, r)>0 & ret.pair.dip(:, a, k, z, r)<99.9); % find dips as function of distance for the same simulation, but no retinal degeneration OR lift
+%                         if min(ind_min)>0; ind = [min(ind_min)-1; ind_min]; end % add back first 0
+%                         if ~isempty(ind_min)
+%                             tmp = interp1(ret.pair.dip(ind_min, a, k, z, r), ret.d_range(ind_min), dip_crit(dc)); % find the distance that would produce that dip criterion
+%                             min_dist = cat(1, min_dist, tmp);
+%                         end
+%
+%
+%                     end
+%                 end
+%             end
+%         end
+%     end
+% end
+%
+%
+%
+
+% %% bar plots
+% %% make bar graph
+% figure(8); clf
+%
+% subplot(1,2,1)
+%
+% data = [1557	1400; % S1: 60%, no axon, no axon no lift
+%     2291	2059; % S2: 60%, no axon, no axon no lift
+%     1324	1191	];% S3: 60%, no axon, no axon no lift
+% bar(1:3, data); hold on
+% set(gca, 'YLim', [0 2500])
+%
+% subplot(1,2,2)
+% bar([1 2 3 4], [1761 1607 846 807])
+%
+% err = [1367	2061;
+%     1220	1928;
+%     683	967;
+%     723  876];
+%
+% % add error bar (inter quartile on minimum)
+%
+% for i = 1:4
+%     l= line([i+.22 i+.22], err(i,:));
+%     set(l, 'Color', 'k')
+% end
+%
+% set(gca, 'YLim', [0 2500])
+%
+%
+% return
+%
+% %% plot the delaunay Triangulation
+% figure(6); clf
+% clear gvv
+% %gvv = squeeze(gv(s, find(ret.a_range>2.5), find(ret.k_range>10), :, :));
+% %gvv = squeeze(gv(s, find(ret.a_range<1.5), find(ret.k_range<5), :, :));
+% gvv = squeeze(gv(s, :, :, :, :));
+% ind = find(~isnan(gvv(:)));
+%
+% for s = 1:3
+%     rdDT  = ret_s.single.thr_RD_fac(ind);
+%     zDT  = ret_s.single.thr_Z_fac(ind);
+%     subplot(1,3, s)
+%
+%     DT = delaunayTriangulation( rdDT, zDT);
+%     if ~isempty(DT.ConnectivityList)
+%         C = convexHull(DT);
+%         h(k)=patch(DT.Points(C,1),DT.Points(C,2), 'r', 'EdgeColor', 'none', 'FaceAlpha',.1); hold on
+%     end
+%
+%     gvv = squeeze(gv_lr(s, :, :, :, :));
+%     ind = find(~isnan(gvv(:)));
+%     rdDT  = ret_s.single.thr_RD_fac(ind);
+%     zDT  = ret_s.single.thr_Z_fac(ind);
+%
+%     axis equal
+%     set(gca, 'YLim', [ .9 13])
+%     set(gca, 'XLim', [ .9 8])
+%
+%     xlabel('Rd')
+%     ylabel('Z')
+%     set(gca, 'YTick', [1:12])
+%     set(gca, 'XTick', [1:8])
+%
+% end
+%
+% %                 end
+% %             end
+% %
+% %                             tmp_dip = ret.pair.dip(d, :, :, z, r); tmp_dip  = tmp_dip(g_ind); % find the dip values for that distance
+% %                             dipMat(d, eI-1) = nanmedian(tmp_dip(ind)); % median value of dip, over all a and k
+% %                         end
+% %                         ind = find(dipMat(:, 1)>0);
+% %                         d_val(z, r, eI) = interp1(dipMat(ind, 1), ret.d_range(ind), contourList);
+% %                         plot(ret.eI_range(eI), d_val(z, r, eI), '.', 'MarkerSize', 10)
+% %                     end
+% %                 end
+% %             end
+% %         end
+% %     end
+% % end
+%
+%
+% %
+% % ret.eI_range = 50:100:750;
+% % figure(10); clf; hold on
+% % figure(11); clf; hold on
+% % contourList = [90];
+% % for a = 3; %1:length(ret.a_range)
+% %     for k = 9; %1:length(ret.k_range)
+% %         for z = 1%:length(ret.z_range)
+% %             for r = 1%:length(ret.rd_range)
+% %                 if gv_gen(a, k, z, r)==1
+% %                     tmp_eI = ret_s.single.eI(a, k, z, r);  % find the eI values for that simulation
+% %
+% %                     for eI = 2:length(ret.eI_range)
+% %                         ind = find(tmp_eI>=ret.eI_range(eI-1)-50 & tmp_eI<ret.eI_range(eI)+50);
+% %                         for d = 1:length(ret.d_range)
+% %                             tmp_dip = ret.pair.dip(d, :, :, z, r); tmp_dip  = tmp_dip(g_ind); % find the dip values for that distance
+% %                             dipMat(d, eI-1) = nanmedian(tmp_dip(ind)); % median value of dip, over all a and k
+% %                         end
+% %                         ind = find(dipMat(:, 1)>0);
+% %                         d_val(z, r, eI) = interp1(dipMat(ind, 1), ret.d_range(ind), contourList);
+% %                         plot(ret.eI_range(eI), d_val(z, r, eI), '.', 'MarkerSize', 10)
+% %                     end
+% %                 end
+% %             end
+% %         end
+% %     end
+% % end
+%
+%
+%
+%
+% %         figure(10);[c,h]= contour(ret.eI_range(1:(end-1)),ret.d_range,dipMat,contourList);
+% %         figure(11); hold on
+% %         count = 1;
+% %         xc = [];
+% %         yc = [];
+% %         i=1;
+% %
+% %
+% %         while count<size(c,2)
+% %             cc = c(1,count);
+% %             n = c(2,count);
+% %             if cc==50
+% %                 xc= c(1,(count+1):(count+n));
+% %                 yc = c(2,(count+1):(count+n));
+% %             end
+% %
+% %             count = count+n+1;
+% %             i=i+1;
+% %         end
+% %
+% %         lineStyles = {'k','k','k'};
+% %         if ~isempty(xc)
+% %             plot(xc,yc,'ko', 'MarkerFaceColor', 'k'); hold on
+% %
+% %
+% %         end
+% %     end
+%
+%
+%
+%
+% %%
+%
+% % for s = 1:3
+% %     for a = 1:length(ret.a_range)
+% %         for k = 1:length(ret.k_range)
+% %             dip = ret.pair.dip(d_ind(s), a, k, z, r); % what's the dip for a 60% 2 point discrim threshold for that subject
+% %             if ~isnan(dip) && dip>0 && ~isnan(gv(s, a, k, z, r))
+% %                 ii = find(ret.pair.dip(:, a, k, 1, r)>0); % dips with no lift
+% %                 if length(ii)>3
+% %                     ret.pair.d_val_z0(s, a, k, r) =interp1(ret.pair.dip(ii, a, k, 1, r), ret.d_range(ii), dip)
+% %                 end
+% %             end
+% %         end
+% %     end
+% % end
+% %
+% %
+% %
+% % d_val = ret.pair.d_val_z0(s,:, :, 1); d_val = d_val(:);
+% % ind = find(~isnan(d_val(:)));
+% % disp('median')
+% % meddata(s) = round(median(d_val(ind)))
+% % qt(s,:) = round(prctile(d_val(ind), [25 75]))
+% %
+% % end
+%
+%
+% %clist = [1 0 0; 0 1 0 ; 0 0 1];
+%
+% ret.pair.d_val_z0 = NaN(3,length(ret.a_range), length(ret.k_range), length(ret.z_range), length(ret.rd_range));
+%
+% for s = 1:3
+%     for a = 1:length(ret.a_range)
+%         for k = 1:length(ret.k_range)
+%             for z = 2:length(ret.z_range)
+%                 for r = 1:length(ret.rd_range)
+%                     dip = ret.pair.dip(d_ind(s), a, k, z, r); % what's the dip for a 60% 2 point discrim threshold for that subject
+%                     if ~isnan(dip) && dip>0 && ~isnan(gv(s, a, k, z, r))
+%                         ii = find(ret.pair.dip(:, a, k, 1, r)>0); % dips with no lift
+%                         if length(ii)>3
+%                             ret.pair.d_val_z0(s, a, k, r) =interp1(ret.pair.dip(ii, a, k, 1, r), ret.d_range(ii), dip)
+%                         end
+%                     end
+%                 end
+%             end
+%         end
+%     end
+%
+%     d_val = ret.pair.d_val_z0(s,:, :, 1); d_val = d_val(:);
+%     ind = find(~isnan(d_val(:)));
+%     disp('median')
+%     meddata(s) = round(median(d_val(ind)))
+%     qt(s,:) = round(prctile(d_val(ind), [25 75]))
+%
+% end
+% save([savestr, '_finished']);
+%
+%
+%
+%
+%
+% %%
+% % a & k do current spread
+% % z height from surface
+% % d distance between electrodes
+% % r ret damage
+% %   gv(s, a, k, z, r)
+% figure(7); clf
+% for s = 1:3
+%     subplot(1, 3, s)
+%     zi = [1:3:21];  % index into lift.  1 is on the surface
+%     ai = 2;  % index into a
+%     ki = 11; % index into k
+%     ri = 1;
+%
+%     gvv = squeeze(gv(s, :, :, :, ri));
+%     ind = find(~isnan(gvv(:)));
+%
+%     % ret_s.single.eI(a, k, z, 1); % amplitude y axis
+%     % ret.pair.dip(d, a, k, z, 1); % dip, before removing lift
+%     % ret.pair.dip(d, a, k, 1, 1); % the same simulation, but now the electrode is on the surface
+%
+%
+%     zz = squeeze(ret.pair.dip(:, ai, ki, zi, 1)); % this is a vector of dip as a function of distance.  Where does amplitude fit in?
+%
+%     plot(ret.d_range,zz')
+%     xlabel('distance')
+%     ylabel('dip')
+%     legend(num2str(ret.z_range(zi)'),'Location','NorthWest')
+% end
+% %zz = squeeze(ret.pair.dip(:, ai, :, 1, zi)); %
+%
+% % zz = reshape(zz,size(zz,1),size(zz,2)*size(zz,3));
+%
+% % surf(ret.k_range,ret.d_range,zz)
+% % ylabel('distance')
+% % xlabel('k')
+% % zlabel('dip')
+%
+% %%
+%
+%
+%
+% %
+% % %% create psychometric functions,
+% % clear ret; ret = cs.setdefaultparams(res_flag);
+% % ret.a = 1.5; ret.k = 15;
+% % ret.t_lift = 0;
+% % ret.y = [0 0];
+% % ret_saved = ret;
+% %
+% % dteList = [.5:.3:6]*1000; % distance between the two electrodes
+% %
+% % % regression parameters
+% % B0 = -0.0599;
+% % keI= -0.003;
+% % kdte = 0.8293/1000; % in mm
+% % figure(7); clf
+% % a = 1; k=1; p = 1;    ct = 1;
+% % for d = 1:length(dteList)
+% %     ret.x = [-dteList(d)/2 dteList(d)/2];
+% %     for z = 1:length(ret.z_range)
+% %         disp(['fitting z = ', num2str(z),  ' out of ', num2str(length(ret.z_range))]);
+% %         ret.z = -ret.z_range(z);
+% %         ret = cs.calc_dist_from_electrode(ret);
+% %         for r = 1:length(ret.rd_range)
+% %             ret.t_ret = ret.rd_range(r) * ret.t_ret_min;  % assuming that on the retina more current is needed
+% %
+% %             % find the amplitude to reach this threshold
+% %             ret.eI = 400;
+% %             if isfield(ret, "loc")
+% %                 ret = rmfield(ret, "loc");
+% %             end
+% %             ret = cs.fit_currentspreadfast(ret, fitParams);
+% %             if ret.eI>91 && ret.eI<331
+% %                 ret.fitPsycho.eI(ct) = ret.eI * 2;
+% %                 ret.fitPsycho.dte(ct) = dteList(d);
+% %                 % now double it and calculate what the current spread looks like
+% %                 ret.eI = ret.eI * 2;
+% %                 ret = cs.create_currentspread(ret);
+% %
+% %                 % max current value on the surface of the retina
+% %                 I_max= max(max(ret.I(:, :, round(size(ret.I, 3)/2))));
+% %                 % current value directly in between the two electrodes
+% %                 I_mid= interpn(unique(ret.Y), unique(ret.X), unique(ret.Z), ret.I, 0, 0, 0);
+% %
+% %                 ret.fitPsycho.dip(ct) = (I_max-I_mid)./I_max; % 100 means big dip
+% %                 ret.fitPsycho.reg_y(ct) = B0 + (keI * ret.fitPsycho.eI(ct)) + (kdte * dteList(d));
+% %                 ret.fitPsycho.reg_p(ct) = 1/(1+exp(-1*ret.fitPsycho.reg_y(ct)));
+% %                 ret.fitPsycho.z(ct) = ret.z_range(z); % 100 means big dip
+% %                 ret.fitPsycho.rd(ct) = ret.rd_range(r); % 100 means big dip
+% %                 ct = ct + 1;
+% %             end
+% %         end
+% %     end
+% % end
+% % subplot(2,3,1)
+% % plot3(ret.fitPsycho.dte, ret.fitPsycho.eI,  ret.fitPsycho.reg_y, 'b*')
+% % xlabel('dte');ylabel('electrode amplitude');zlabel('reg y')
+% %
+% % subplot(2,3,2)
+% % plot3(ret.fitPsycho.dte, ret.fitPsycho.eI,  ret.fitPsycho.reg_p, 'b*')
+% % xlabel('dte');ylabel('electrode amplitude');zlabel('reg p(2)')
+% %
+% % subplot(2,3,3)
+% % plot3( ret.fitPsycho.dte, ret.fitPsycho.eI,  ret.fitPsycho.dip, 'r*')
+% % xlabel('dte');ylabel('electrode amplitude');zlabel('dip')
+% %
+% % subplot(2,3,4)
+% % plot(ret.fitPsycho.dip, ret.fitPsycho.reg_y, 'k*')
+% % ylabel('reg y');xlabel('dip');
+% %
+% % % subplot(2,3, 5)
+% % % plot( ret.fitPsycho.dip,ret.fitPsycho.reg_p, 'k*')
+% % % ylabel('reg p');xlabel('dip');
+% % % set(gca, 'XLim', [0 1])
+% % % set(gca, 'YLim', [0 1])
+% %
+% % subplot(2,3, 5)
+% % plot( ret.fitPsycho.rd,ret.fitPsycho.eI, 'k*')
+% % zlabel('z');ylabel('I');
+% %
+% % subplot(2,3, 6)
+% % plot( ret.fitPsycho.z,ret.fitPsycho.eI, 'k*')
+% % zlabel('z');ylabel('I');
+% % %set(gca, 'XLim', [0 1])
+% % %set(gca, 'YLim', [0 1])
+% %
+% % % subplot(2,3,6)
+% % % plot(ret.fitPsycho.dte, ret.fitPsycho.eI, 'k*')
+% % % xlabel('dte');ylabel('eI');
+% %
+% % %% thresholds
+% % tdata = {1	'B10'	89.0; 1	'B10'	93.0; 2	'A8'	153; 1	'B9'	177; ...
+% %     1	'F10'	177; 2	'A4'	194; 1	'F10'	202; 1	'C6'	210; 2	'F2'	226; ...
+% %     1	'E9'	242; 1	'A8'	250; 2	'D1'	274; 2	'F2'	274; 2	'F7'	274; ...
+% %     1	'A6'	290; 1	'D6'	290; 1	'B4'	323; 2	'B6'	323; 2	'A2'	355; ...
+% %     2	'E10'	484; 3	'B6'	581.0; 3	'F7'	612.5; 3	'B9'	645.0; 3	'B5'	645.0; ...
+% %     3	'A10'	371.0; 3	'F7'	452.0; 3	'F9'	475.5; 3	'B9'	306.0; 3	'B10'	217.0};
+% % cmap = [.3 .3 .3; .5 .5 .5; .7 .7 .7];
+% %
+% % for s = 1:3
+% %     idx = find([tdata{:, 1}]== s);
+% %     counts(s,:) = histc(cat(1, tdata{idx, 3}), [0:100:700]);
+% % end
+% %
+% % figure(10); clf
+% % b = bar([0:100:700],counts,'stacked');
+% % for s = 1:3
+% %     set(b(s), 'FaceColor', cmap(s, :));
+% % end
+% %
+% % val = [];
+% % for s = [1 2 3]
+% %     idx = find([tdata{:, 1}]== s);
+% %     val = cat(1, val,cat(1, tdata{idx, 3}) );
+% % end
+% % round(prctile(val, [15 85]))
+% %
+% % val = [];
+% % for s = [1 2 3]
+% %     idx = find([tdata{:, 1}]== s);
+% %     disp(['subject', num2str(s)])
+% %     length(idx)
+% %     round(mean(cat(1, tdata{idx, 3})))
+% %     round(median(cat(1, tdata{idx, 3})))
+% %     round(prctile(cat(1, tdata{idx, 3}), [25 75]))
+% % end
+% %
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %% JUNK
+% %
+% % %% dipsize as a function of z and k, for a fixed value of r
+% % d = 3; % distance between the two electrodes
+% % for a = 1:length(ret.a_range)
+% %     figure(5); subplot(2, 4, a)
+% %     imagesc(ret.z_range, ret.k_range, squeeze(2.55*ret.pair.dip(a, :,:, 1)));
+% %     colormap(gray(256)); hold on
+% %     set(gca, 'XTick',ret.z_range); xlabel('z');
+% %     set(gca, 'YTick',ret.k_range); ylabel('k');
+% %     ylabel('k');
+% %     title('dipsize');
+% %     c = colorbar('Ticks',linspace(1, 255, 5), 'TickLabels',{'0','25','50','75','100'});
+% %     contour(ret.z_range, ret.k_range, squeeze(ret.pair.dip(d, a, :,:, 1)), [30 70], 'g', 'LineWidth', 2)
+% % end
+% %
+% % %% dip doesn't change with retinal damage
+% % dip_range = [30 70];
+% %
+% % cmap = [0 0 0 ; 0 0 1 ; 1 0 0 ;  1 1 1 ];
+% % r=3;
+% % ret.gv_thr = zeros(size(ret.pair.I_max));ret.gv_dip = ret.gv_thr;
+% % ret.gv_thr(find(ret.pair.eI(:)>thr_range(1) & ret.pair.eI(:)<thr_range(2)))=2;
+% % ret.gv_dip(find(ret.pair.dip(:)>dip_range(1) & ret.pair.dip(:)<dip_range(2)))=1;
+% % ret.gv = (ret.gv_thr+ret.gv_dip)==3;
+% %
+% % figure(5); clf
+% % for a = 1:length(ret.a_range)
+% %     subplot(2, ceil(length(ret.a_range)/2), a)
+% %     image(ret.z_range, ret.k_range, squeeze(1+ret.gv_dip(a, :,:, r)+ret.gv_thr(a, :,:, r))); colormap(cmap); hold on
+% %     set(gca, 'XTick',ret.z_range); xlabel('z');
+% %     set(gca, 'YTick',ret.k_range); ylabel('k');
+% %     ylabel('k');
+% %     title(['intersection ret damage  = ', num2str(ret.rd_range(r))]);
+% %     c = colorbar('Ticks',[1.5 2.5 3.5 4.5], 'TickLabels',{'neither','dip','thr','dip+thr'});
+% % end
+% %
+% % for s = 1:3
+% %     ct = 1;
+% %     for a = 1:length(ret.a_range)
+% %         for k = 1:length(ret.k_range)
+% %             for z = 1:length(ret.z_range)
+% %                 ret.z = ret.z_range(z); % no need to make it negative
+% %                 for r = 1:length(ret.rd_range)
+% %                     if ret_s.single.eI(a, k, z, r)<thr_a(s,1)
+% %                         gv(s, a, k, z, r) = NaN; %  criterion II, that thresholds fall within interquartile limits for that S
+% %                     end
+% %                     if ret_s.single.eI(a, k, z, r)>thr_a(s,2)
+% %                         gv(s, a, k, z, r) = NaN; %  criterion II, that thresholds fall within interquartile limits for that S
+% %                     end
+% %                     %                     if ret.pair.dip(d_ind(s), a,k, z, r)<30 || ret.pair.dip(d_ind(s), a,k, z, r)>70
+% %                     %                         gv(s, a, k, z, r) = NaN;
+% %                     %                     end
+% %
+% %                     if (ret.z)>999 && ret_s.single.eI(a,k,z,r)<200
+% %                         gv(s,a, k, :, r) = NaN; %  criterion I, that threshold as a function of z are reasonable, part 1
+% %                     end
+% %                     if (ret.z)<700 && ret_s.single.eI(a,k,z,r)>700
+% %                         gv(s, a, k, :, r) = NaN; %  criterion I, that threshold as a function of z are reasonable, part 2
+% %                     end
+% %                 end
+% %             end
+% %         end
+% %     end
+% % end
+%
+%
+%
