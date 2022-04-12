@@ -82,7 +82,7 @@ for a = 1:length(ret.a_range)
         end
     end
 end
-save([savestr, '_single']);
+save([savestr, '_single'], '-v7.3');
 
 %% plot, current spreads for 2 electrodes at different heights
 fitParams.nreps = 20;
@@ -148,7 +148,7 @@ for d = 1:length(ret.d_range)
         ct = ct+1;
     end
 end
-save([savestr, '_pair']);
+save([savestr, '_pair'], '-v7.3');
 
 %% create isodipcurve
 % replot data from the regression
@@ -230,7 +230,7 @@ for ks = 1:length(ret.k_range)
                         ct = ct+1;
                     end; end;  end;  end;  end; end
 
-save([savestr, '_keepSim']);
+save([savestr, '_keepSim'], '-v7.3');
 %% now calculate what would have happened without lift, RD or either
 clear ret; ret = cs.setdefaultparams(flag);
 
