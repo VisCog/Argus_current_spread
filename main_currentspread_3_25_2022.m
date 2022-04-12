@@ -82,7 +82,7 @@ for a = 1:length(ret.a_range)
         end
     end
 end
-save([savestr, 'single']);
+save([savestr, '_single']);
 
 %% plot, current spreads for 2 electrodes at different heights
 fitParams.nreps = 20;
@@ -169,9 +169,10 @@ amp_min = 177; %177;%177; %
 % find the distances corresponding to each possible dip criterion, and the
 % expected amplitude based on the regression model, for that distance
 clear keepSim;
-err_Thr = 50;
+err_Thr = 25;
 ct = 1;
 for ks = 1:length(ret.k_range)
+    disp([num2str(ks), ' out of ', num2str(length(ret.k_range))]);
     for a = 1:length(ret.a_range)
         for r = 1:length(ret.rd_range)
             clear M;
@@ -198,11 +199,15 @@ for ks = 1:length(ret.k_range)
                     end;  end
 
                 [c,h] =contour(Th_Z_unique,dist_unique, M, [dip_min:dip_max]);
+                [~, ia] = unique(Th_Z_vals(1:length(Th_Z_unique)));
+                tmp_Z = Th_Z_vals(1:length(Th_Z_unique));
+                tmp_eI = eI_vals(1:length(Th_Z_unique)); tmp_z = z_vals(1:length(Th_Z_unique));
+
                 for dd = dip_min:dip_max
 
                     [Th_Z_c, dist_c] = cs.unwrap_contour(c, dd); % the Z values as a function of separation for a single iso curve
-                    eI_c = interp1(Th_Z_vals(1:length(Th_Z_unique)), eI_vals(1:length(Th_Z_unique)), Th_Z_c);
-                    z_c = interp1(Th_Z_vals(1:length(Th_Z_unique)), z_vals(1:length(Th_Z_unique)), Th_Z_c);
+                    eI_c = interp1(tmp_Z(ia), tmp_eI(ia), Th_Z_c);
+                    z_c = interp1(tmp_Z(ia), tmp_z(ia), Th_Z_c);
 
                     g_eI = find(eI_c>amp_min & eI_c<amp_max);
 
@@ -225,7 +230,7 @@ for ks = 1:length(ret.k_range)
                         ct = ct+1;
                     end; end;  end;  end;  end; end
 
-
+save([savestr, '_keepSim']);
 %% now calculate what would have happened without lift, RD or either
 clear ret; ret = cs.setdefaultparams(flag);
 
