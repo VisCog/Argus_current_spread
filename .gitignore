@@ -1,0 +1,7 @@
+*.pyc
+*.cache
+*.ipynb_checkpoints/
+*.pickle
+*__pycache__
+*.log
+/Python/data/*
