@@ -153,7 +153,7 @@ return
 
 %% create isodipcurve
 % find data close to the predicted regression line
-p = 1.0e+02 * [0.003063282575664  -1.546555906566781];
+p =  1.0e+02 * [0.003063041388051  -3.849023842682739];
 amp_pred = polyval(p, ret.d_range);
 
 amp_max = 499; %280; 177; %;
@@ -165,8 +165,9 @@ clear keepSim;
 err_Thr = 25;
 ct = 1;
 for ks = 1:length(ret.k_range)
-    disp([num2str(ks), ' out of ', num2str(length(ret.k_range))]);
+    disp(['ks ', num2str(ks), ' out of ', num2str(length(ret.k_range))]);
     for a = 1:length(ret.a_range)
+           disp(['a ', num2str(a), ' out of ', num2str(length(ret.a_range))]);
         for r = 1:length(ret.rd_range)
             clear M;
             ind = find(ret_pair.eI>amp_min & ret_pair.eI<amp_max & ret_pair.a == ret.a_range(a) & ret_pair.k == ret.k_range(ks)  & ret_pair.Th_RD == ret.rd_range(r));
@@ -218,8 +219,8 @@ for ks = 1:length(ret.k_range)
                         keepSim(ct).k = ret.k_range(ks);
                         keepSim(ct).dip = dd;
                         [~, si] = sort(keepSim(ct).dist); % probably unnecessary
-                        patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
-                            'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
+%                         patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
+%                             'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
                         ct = ct+1;
                     end; end;  end;  end;  end; end
 
@@ -229,10 +230,13 @@ save([savestr, '_keepSim'], '-v7.3');
 figure(4); clf; hold on
 plot(ret.d_range(2:end),amp_pred(2:end) , 'g-', 'LineWidth', 2); hold on
 for ct = 1:length(keepSim)
-%       [~, si] = sort(keepSim(ct).dist); % probably unnecessary
-%      patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
-%                             'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
-      plot( keepSim(ct).dist, keepSim(ct).eI, '.',  'Color',[.3 .3 .3], 'MarkerSize',2);
+%        [~, si] = sort(keepSim(ct).dist); % probably unnecessary
+%       patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
+%                              'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
+for i = 1:length()
+shp = = alphaShape(x,y)
+plot(shp,'FaceColor',[.3 .3 .3], 'FaceAlpha',0.2, 'EdgeAlpha', 0); drawnow
+%     p =  plot( keepSim(ct).dist, keepSim(ct).eI, 'o',  'MarkerFaceColor',[.3 .3 .3], 'MarkerEdgeColor',[.3 .3 .3], 'MarkerSize',4);
 end
 set(gca, 'XLim', [500 4000])
 xlabel('Physical Distance ');
@@ -240,6 +244,7 @@ ylabel('Amplitude');
 
 
 %% now calculate what would have happened without lift, RD or either
+%5 Figure 10 Panel D
 clear ret; ret = cs.setdefaultparams(flag);
 
 for ks = 1:length(keepSim)
@@ -332,7 +337,7 @@ figure(6); clf
 hist([keepSim(:).dip])
 set(gca, 'XLim', [0 100])
 set(gca, 'XTick', 0:10:100)
-xlabel('Dip required for 60% discrimination')
+xlabel('Dip required for 75% discrimination')
 set(gcf, 'Position', [1000        1107        1121         231])
 
 %% histogram of distances, when Z, RD or both is removed

@@ -110,7 +110,7 @@ title(sprintf('b0 = %5.5f, ka = %5.5f, kd = %5.5f',p.b0,p.ka,p.kdte));
 
 %% Contour plot for amp and dte
 
-contourList = [.5,.6,.7];
+contourList = [.65,.75,.85];
 figure(2)
 clf
 [c,h]= contour(dteList,aList,probList,contourList);
@@ -268,7 +268,7 @@ view(-20,20)
 
 %% Contour plots for maximal and minimal dta
 
-contourList = [.5,.6,.7];
+contourList = [.65,.75,.85];
 figure(4)
 clf
 [c,h]= contour(dteList,aList,probList_dta,contourList);
@@ -296,7 +296,7 @@ lineStyles = {'g:','g-','g-.'};
 
 clf
 hold on
-for i=2 %1:length(contourList)
+for i=2 %1:length(contourList) % for 75% threshold
     h(i,1) = plot(xcdta{i},ycdta{i},lineStyles{i},'LineWidth',2);
     p = polyfit(xcdta{i},ycdta{i}, 1)
     str{i} = sprintf('%d%%',100*contourList(i));
@@ -316,8 +316,8 @@ end
 
 xlabel('Physical Distance ');
 ylabel('Amplitude');
-text(2750,350,'One Percept');
-text(1000,550,'Two Percepts');
+text(3500,350,'Two Percept');
+text(1000,550,'One Percepts');
 %legend(str,'Location','NorthWest')
 set(gca,'XLim',1000*[.575,4])
 set(gca,'YLim',[50,700])

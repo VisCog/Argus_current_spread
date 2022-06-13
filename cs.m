@@ -12,7 +12,7 @@ classdef cs
 
             ret.rad = 225/2;
             ret.lim = [500, 1500, 1100]; % how much retina to simulate. x, y, z
-            ret.Isc = .4; % how bright the current is on the graphs
+            ret.Isc = .439; % how bright the current is on the graphs
             ret.eI = 400; % current on the electrode
             ret.t_ret_min = 50; % minimum retinal current required to reach perceptual threshold
             ret.t_ret = 50;
@@ -22,7 +22,7 @@ classdef cs
                 ret.ss = 50; % simulation resolution
                 ret.a_range = linspace(.5, 3, 5);
                 ret.k_range = linspace(3, 15, 5); % controls current spread
-                ret.rd_range = 1:2:15; % scaling factor representing retinal damage
+                ret.rd_range = 1:5:25; % scaling factor representing retinal damage
             else
                 % neurophysiological paramers
                 ret.ss = 50;
@@ -129,9 +129,9 @@ classdef cs
 
         function I = create_currentspreadfig(ret)
             Sxy = ret.I(:, :, round(size(ret.I, 3)/2)); % slice on the retina, z = 0
-
+            disp(['max I',  num2str(round(max(ret.I(:))))]);
             subplot(1,2,1)
-            imagesc(unique(ret.X(:)), unique(ret.Y(:)), Sxy*ret.Isc); colormap(hot); hold on
+            image(unique(ret.X(:)), unique(ret.Y(:)), Sxy*ret.Isc); colormap(hot(256)); hold on
             for i = 1:length(ret.x)
                 h = viscircles([ret.x(i), ret.y(i)],ret.rad-1, 'Color', [.8 .8 .3], 'LineWidth', .5);
             end
@@ -150,7 +150,10 @@ classdef cs
 
             subplot(1,2,2)
             Sxz = flipud(rot90(squeeze(ret.I(round(size(ret.I, 1)/2), :, :)))); % slice along the midpoint of y
-            imagesc(unique(ret.X(:)), unique(ret.Z(:)),Sxz*ret.Isc); colormap(hot); hold on
+            disp(['max I ',  num2str(round(max(ret.I(:))))]);
+            image(unique(ret.X(:)), unique(ret.Z(:)),Sxz*ret.Isc); 
+            colormap(hot(256)); hold on
+           % colorbar(gca)
             plot(unique(ret.X(:)), zeros(size(unique(ret.X(:)))), 'w--');
             for i = 1:length(ret.x)
                 plot([ret.x(i)-ret.rad, ret.x(i)+ret.rad], [ret.z-3, ret.z-3],'-', 'Color', [.8 .8 .3],  'LineWidth', 2);
@@ -166,7 +169,7 @@ classdef cs
                     plot(x(ret.loc(l, 1)), 0, 'bp', 'MarkerSize', 5);
                 end
                 plot(0, 0, 'b*')
-            end
+            end        
         end
 
         function [xc,yc] = unwrap_contour(c, cval)
@@ -196,7 +199,7 @@ classdef cs
                 1	'A6'	290; 1	'D6'	290; 1	'B4'	323; 2	'B6'	323; 2	'A2'	355; ...
                 2	'E10'	484; 3	'B6'	581.0; 3	'F7'	612.5; 3	'B9'	645.0; 3	'B5'	645.0; ...
                 3	'A10'	371.0; 3	'F7'	452.0; 3	'F9'	475.5; 3	'B9'	306.0; 3	'B10'	217.0};
-            cmap = [.3 .3 .3; .5 .5 .5; .7 .7 .7];
+            cmap = [ 0 .6 .4; ; 0 0 1; 0 .5 1 ];
 
             % calculate and plot amplitude values
             for s = 1:3
@@ -205,7 +208,8 @@ classdef cs
             end
 
             figure(10); clf
-            b = bar([0:100:700],counts,'stacked');
+           b = bar([0:100:700],counts,'stacked', 'EdgeAlpha', 0);
+
             for s = 1:3
                 set(b(s), 'FaceColor', cmap(s, :));
             end
