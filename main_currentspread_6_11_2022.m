@@ -20,10 +20,10 @@ fitParams.tol = 0.1; fitParams.lo = 0; fitParams.hi = 5000; fitParams.thr = 1;
 
 %% begin simulations, basic parameters
 safety_lim = 660;
-flag.res = 'highres'; % running the code with coarse or fine parameter sampling. Warning! highres is very slow!
+flag.res = 'lowres'; % running the code with coarse or fine parameter sampling. Warning! highres is very slow!
 flag.dip = 'perceptual';  % default is assuming that electric current below threshold has no perceptual effect, alternative is 'electrical'
 flag.rd = 'scale'; % 'threshold', RD just changes the threshold, or scales all current linearly
-savestr = ['6_9_2022', '_', flag.res];
+savestr = ['6_12_2022', '_', flag.res];
 
 
 %% plot, current spreads for 2 electrodes at different heights
@@ -153,7 +153,7 @@ return
 
 %% create isodipcurve
 % find data close to the predicted regression line
-p = 1.0e+02 * [0.003063282575664  -1.546555906566781];
+p =  1.0e+02 * [0.003063041388051  -3.849023842682739];
 amp_pred = polyval(p, ret.d_range);
 
 amp_max = 499; %280; 177; %;
@@ -165,8 +165,9 @@ clear keepSim;
 err_Thr = 25;
 ct = 1;
 for ks = 1:length(ret.k_range)
-    disp([num2str(ks), ' out of ', num2str(length(ret.k_range))]);
+    disp(['ks ', num2str(ks), ' out of ', num2str(length(ret.k_range))]);
     for a = 1:length(ret.a_range)
+           disp(['a ', num2str(a), ' out of ', num2str(length(ret.a_range))]);
         for r = 1:length(ret.rd_range)
             clear M;
             ind = find(ret_pair.eI>amp_min & ret_pair.eI<amp_max & ret_pair.a == ret.a_range(a) & ret_pair.k == ret.k_range(ks)  & ret_pair.Th_RD == ret.rd_range(r));
@@ -218,8 +219,8 @@ for ks = 1:length(ret.k_range)
                         keepSim(ct).k = ret.k_range(ks);
                         keepSim(ct).dip = dd;
                         [~, si] = sort(keepSim(ct).dist); % probably unnecessary
-                        patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
-                            'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
+%                         patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
+%                             'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
                         ct = ct+1;
                     end; end;  end;  end;  end; end
 
@@ -229,17 +230,30 @@ save([savestr, '_keepSim'], '-v7.3');
 figure(4); clf; hold on
 plot(ret.d_range(2:end),amp_pred(2:end) , 'g-', 'LineWidth', 2); hold on
 for ct = 1:length(keepSim)
-%       [~, si] = sort(keepSim(ct).dist); % probably unnecessary
-%      patchline( keepSim(ct).dist(si), keepSim(ct).eI(si), ...
-%                             'EdgeColor',[.3 .3 .3], 'LineWidth',2,'EdgeAlpha',0.2); drawnow
-      plot( keepSim(ct).dist, keepSim(ct).eI, '.',  'Color',[.3 .3 .3], 'MarkerSize',2);
+    disp(['ct ', num2str(ct), ' out of ', num2str(length(keepSim))]);
+    s =  scatter(keepSim(ct).dist,keepSim(ct).eI, ...
+        'MarkerFaceColor',[.3 .3 .3], 'MarkerFaceAlpha',0.2, 'MarkerEdgeAlpha', 0); drawnow
+    drawnow
 end
-set(gca, 'XLim', [500 4000])
+set(gca, 'XLim', [1500 4000])
 xlabel('Physical Distance ');
 ylabel('Amplitude');
 
+%% Z vs. RD for successful simulations
+figure(5); clf
+for ks = 1:length(keepSim)
+    p = scatter([keepSim(ks).Th_Z], [keepSim(ks).Th_RD]+.03*randn(size(keepSim(ks).Th_RD)), ...
+        'ko', 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', .5); hold on
+drawnow;
+end
+xlabel('Lift values');
+ylabel('RD values');
+axis equal
+set(gca, 'XLim', [.9 9])
+set(gca, 'YLim', [.9 5.5])
 
 %% now calculate what would have happened without lift, RD or either
+%5 Figure 10 Panel D
 clear ret; ret = cs.setdefaultparams(flag);
 
 for ks = 1:length(keepSim)
@@ -314,12 +328,23 @@ end
 save([savestr, '_keepSim2'], '-v7.3');
 %% scatter plots
 
+figure(4); clf; hold on
+plot(ret.d_range(2:end),amp_pred(2:end) , 'g-', 'LineWidth', 2); hold on
+for ct = 1:10:length(keepSim)
+    disp(['ct ', num2str(ct), ' out of ', num2str(length(keepSim))]);
+    scatter( keepSim(ct).dist, keepSim(ct).eI,'ko', 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', .5); hold on
+end
+set(gca, 'XLim', [1500 3500])
+set(gca, 'YLim', [0 600])
+xlabel('Physical Distance ');
+ylabel('Amplitude');
+
 %% Z vs. RD for successful simulations
 figure(5); clf
-for ks = 1:length(keepSim)
+for ks = 1:10:length(keepSim)
+    disp(['ct ', num2str(ct), ' out of ', num2str(length(keepSim))]);
     p = scatter([keepSim(ks).Th_Z], [keepSim(ks).Th_RD]+.03*randn(size(keepSim(ks).Th_RD)), ...
         'ko', 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', .5); hold on
-drawnow;
 end
 xlabel('Lift values');
 ylabel('RD values');
@@ -332,7 +357,7 @@ figure(6); clf
 hist([keepSim(:).dip])
 set(gca, 'XLim', [0 100])
 set(gca, 'XTick', 0:10:100)
-xlabel('Dip required for 60% discrimination')
+xlabel('Dip required for 75% discrimination')
 set(gcf, 'Position', [1000        1107        1121         231])
 
 %% histogram of distances, when Z, RD or both is removed

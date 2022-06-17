@@ -120,6 +120,7 @@ exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3a.pdf'],'ContentType','ve
 
 %% Contour plot for amp and dte
 
+
 contourList = [.65,.75,.85]; %two-point discrimination thresholds
 f2 = figure(2);
 f2.Position = [488 308 385 453];
@@ -299,6 +300,7 @@ exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7a.emf'],'ContentType','ve
 contourList = [.65,.75,.85];
 f4 = figure(4);
 f4.Position = [488 308 385 453];
+
 clf
 [c,h]= contour(dteList,aList,probList_dta,contourList);
 
@@ -357,6 +359,7 @@ disp(['predicted spatial res = ', num2str(tp_val)])
  %         'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
 %rectangle('Position',[0 0  tp_val(3) 476],'LineStyle','--', ...
    %       'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+
 %legend(str,'Location','NorthWest')
 set(gca,'XLim',1000*[.575,4])
 set(gca,'YLim',[50,700])
