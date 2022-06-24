@@ -8,7 +8,7 @@ S = xls2struct(fileName);
 
 %% List of free parameters for all models
 funName = 'logit';  % doing logistic regression
-% funName = 'normcdf';
+% funName = 'normcdf';p
 
 freeList_b0 = {'b0'};
 freeList_a = {'b0','ka'};
@@ -28,7 +28,7 @@ e1 ={S.pts_electrode1{:}}; % not used
 e2 = {S.pts_electrode2{:}}; % not used
 dte =  [S.electrode_distance{:}];  % distance to electrode
 dta = [S.dta_bi{:}]; % distance to electrode - distance to the axon
-daa = [S.daa_u{:}];  % distance along the axon (not used)
+daa = [S.daa_bi{:}];  % distance along the axon (not used)
 a = (amp1+amp2)/2;  % mean amplitude
 
 np = [S.pts_number_processed{:}];  % number of percepts reported (1 or 2)
