@@ -1,3 +1,6 @@
+
+clear all
+close all
 fileName = 'all_subjects_summarized.csv';
 
 % Load in the csv file
@@ -5,7 +8,7 @@ S = xls2struct(fileName);
 
 %% List of free parameters for all models
 funName = 'logit';  % doing logistic regression
-% funName = 'normcdf';
+% funName = 'normcdf';p
 
 freeList_b0 = {'b0'};
 freeList_a = {'b0','ka'};
@@ -25,7 +28,7 @@ e1 ={S.pts_electrode1{:}}; % not used
 e2 = {S.pts_electrode2{:}}; % not used
 dte =  [S.electrode_distance{:}];  % distance to electrode
 dta = [S.dta_bi{:}]; % distance to electrode - distance to the axon
-daa = [S.daa_u{:}];  % distance along the axon (not used)
+daa = [S.daa_bi{:}];  % distance along the axon (not used)
 a = (amp1+amp2)/2;  % mean amplitude
 
 np = [S.pts_number_processed{:}];  % number of percepts reported (1 or 2)
@@ -82,11 +85,11 @@ disp(['aic axon = ', num2str(aic)]);
 
 figure(1)
 clf
-%surf(dteList,aList,probList,'FaceAlpha',.5);
+surf(dteList,aList,probList,'FaceAlpha',.5 ,'EdgeColor','none');
 grid off
-xlabel('Physical Distance ');
-ylabel('Amplitude');
-zlabel('P(2 percepts)');
+xlabel('Physical Distance (\mum) ');
+ylabel('Amplitude (\muA)');
+zlabel('P("2 Percepts")');
 set(gca, 'XLim', [0 6000])
 set(gca, 'YLim', [0 650])
 % Plot data for each of the bins:
@@ -105,13 +108,22 @@ for i=1:(length(aBin)-1)
         end
     end
 end
+c=  colorbar;
+pos  = c.Position;
+set(c,'Position',[0.820357142857141 0.19952380952381 0.031499999999999 0.493333333333336])
 view(-20,20)
 title(sprintf('b0 = %5.5f, ka = %5.5f, kd = %5.5f',p.b0,p.ka,p.kdte));
 
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3a.eps'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3a.emf'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3a.pdf'],'ContentType','vector')
+
 %% Contour plot for amp and dte
 
-contourList = [.5,.6,.7];
-figure(2)
+
+contourList = [.65,.75,.85]; %two-point discrimination thresholds
+f2 = figure(2);
+f2.Position = [488 308 385 453];
 clf
 [c,h]= contour(dteList,aList,probList,contourList);
 
@@ -124,30 +136,40 @@ for i=1:length(contourList)
 end
 
 lineStyles = {'k:','k-','k-.'};
-
 clf
 hold on
 for i=1:length(contourList)
     plot(xc{i},yc{i},lineStyles{i},'LineWidth',2)
     str{i} = sprintf('%d%%',100*contourList(i));
-    text(xc{i}(end),yc{i}(end)-25,str{i},'HorizontalAlignment','center');
+    text(xc{i}(end)-150,yc{i}(end)+25,str{i},'HorizontalAlignment','center');
     tmp = interp1(yc{i}, xc{i}, [210 274 476]);
     disp(['predicted spatial res = ', num2str(tmp)])
 end
-xlabel('Physical Distance ');
-ylabel('Amplitude');
-text(2750,350,'One Percept');
-text(1000,550,'Two Percepts');
-line([500 4000], [ 274 274])
-line([500 4000], [ 476 476])
-line([500 4000], [ 210 210])
+xlabel('Physical Distance (\mum)');
+ylabel('Amplitude (\muA)');
+text(1000,600,'One Percept');
+text(2800,100,'Two Percepts');
+%line([500 4000], [ 274 274], 'lineWidth',1.5)
+%line([500 4000], [ 476 476], 'lineWidth',1.5)
+%line([500 4000], [ 210 210], 'lineWidth',1.5)
 
-
+%find 75% 2p thresh from median thresholds
+tp_val = interp1(yc{2}, xc{2}, [210 274 476]);
+disp(['predicted spatial res = ', num2str(tp_val)])
+rectangle('Position',[0 0  tp_val(1) 210],'LineStyle','--', ...
+          'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+rectangle('Position',[0 0  tp_val(2) 274],'LineStyle','--', ...
+          'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+rectangle('Position',[0 0  tp_val(3) 476],'LineStyle','--', ...
+          'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
 %legend(str,'Location','NorthWest')
 set(gca,'XLim',1000*[.575,4])
 set(gca,'YLim',[50,700])
-grid
 
+
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3b.eps'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3b.emf'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig3b.pdf'],'ContentType','vector')
 %% Fits, Chi-squared and p-values
 
 % initial parameters
@@ -259,17 +281,26 @@ surf(dteList,aList,probList_dtema,'FaceAlpha',.5,'EdgeColor','none');
 set(gca, 'XLim', [0 6000])
 set(gca, 'YLim', [0 650])
 
-ylabel('Amplitude');
-xlabel('Physical Distance ');
-zlabel('P(2 percepts)');
+ylabel('Amplitude (\muA)', 'fontweight','bold');
+xlabel('Physical Distance  (\mum)','fontweight','bold');
+zlabel('P("2 percepts")', 'fontweight','bold');
 grid off
-
+c=  colorbar;
+pos  = c.Position;
+set(c,'Position',[0.820357142857141 0.19952380952381 0.031499999999999 0.493333333333336])
 view(-20,20)
+
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7a.eps'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7a.emf'],'ContentType','vector')
+%exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7a.pdf'],'ContentType','vector')
+
 
 %% Contour plots for maximal and minimal dta
 
-contourList = [.5,.6,.7];
-figure(4)
+contourList = [.65,.75,.85];
+f4 = figure(4);
+f4.Position = [488 308 385 453];
+
 clf
 [c,h]= contour(dteList,aList,probList_dta,contourList);
 
@@ -296,11 +327,11 @@ lineStyles = {'g:','g-','g-.'};
 
 clf
 hold on
-for i=2 %1:length(contourList)
+for i=2 %1:length(contourList) % for 75% threshold
     h(i,1) = plot(xcdta{i},ycdta{i},lineStyles{i},'LineWidth',2);
     p = polyfit(xcdta{i},ycdta{i}, 1)
     str{i} = sprintf('%d%%',100*contourList(i));
-    text(xcdta{i}(1),ycdta{i}(1)-25,str{i},'HorizontalAlignment','center','Color','g');
+    text(xcdta{i}(1)-150,ycdta{i}(1)+30,str{i},'HorizontalAlignment','center','Color','g');
     tmp = interp1(ycdta{i}, xcdta{i}, [210 274 476]);
     disp(['predicted spatial res no axon = ', num2str(tmp)])
 end
@@ -310,20 +341,36 @@ lineStyles = {'b:','b-','b-.'};
 for i=2 %1:length(contourList)
     h(i,2) = plot(xcdtema{i},ycdtema{i},lineStyles{i},'LineWidth',2);
     str{i} = sprintf('%d%%',100*contourList(i));
-    text(xcdtema{i}(1),ycdtema{i}(1)-25,str{i},'HorizontalAlignment','center','Color','b');
+    text(xcdtema{i}(1)+350,ycdtema{i}(1)+30,str{i},'HorizontalAlignment','center','Color','b');
     
 end
+ylabel('Amplitude (\muA)', 'fontweight','bold');
+xlabel('Physical Distance  (\mum)','fontweight','bold');
 
-xlabel('Physical Distance ');
-ylabel('Amplitude');
-text(2750,350,'One Percept');
-text(1000,550,'Two Percepts');
+text(3000,200,'Two Percepts');
+text(1000,550,'One Percept');
+
+%find 75% 2p thresh from median thresholds for max axon model
+max_axon_val = interp1(yc{2}, xc{2}, [210 274 476]);
+disp(['predicted spatial res = ', num2str(tp_val)])
+%rectangle('Position',[0 0  tp_val(1) 210],'LineStyle','--', ...
+ %         'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+%rectangle('Position',[0 0  tp_val(2) 274],'LineStyle','--', ...
+ %         'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+%rectangle('Position',[0 0  tp_val(3) 476],'LineStyle','--', ...
+   %       'EdgeColor', [0.5 0.5 0.5 0.5], 'LineWidth',2)
+
 %legend(str,'Location','NorthWest')
 set(gca,'XLim',1000*[.575,4])
 set(gca,'YLim',[50,700])
-line([500 4000], [ 274 274])
-line([500 4000], [ 476 476])
-line([500 4000], [ 210 210])
+
+
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7b.eps'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7b.emf'],'ContentType','vector')
+exportgraphics(gcf,['.' filesep 'figures' filesep 'fig7b.pdf'],'ContentType','vector')
+%% Fits, Chi-squared and p-values
+
+
 grid off
 
 legend(h(2,:),{'Maximal distance to axon','Minimal distance to axon'},...
